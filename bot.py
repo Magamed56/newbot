@@ -55,7 +55,7 @@ async def menu_handler(update: Update, context: CallbackContext) -> None:
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         await update.message.reply_text("🛠 Выберите лабораторную тему:", reply_markup=reply_markup)
     
-    elif text == "🛠 СРС Темы":
+    elif text == "🛠 СРС темы":
         keyboard = [[KeyboardButton(topic)] for topic in CRC_TOPICS.keys()]
         keyboard.append([KeyboardButton("⬅ Назад")])
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
