@@ -33,7 +33,7 @@ CRC_TOPICS = {
 # Главное меню с кнопками
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные темы")]
+        [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные темы"),KeyboardButton("🛠 СРС темы")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
