@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InputFile
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
 
 # Включаем логирование
@@ -12,31 +12,31 @@ TOKEN = os.getenv("TOKEN")
 # Создаем объект бота
 app = Application.builder().token(TOKEN).build()
 
-# Данные для лекций и файлы к ним
+# Данные для лекций с файлами
 LECTURE_TOPICS = {
     "Введение в Python": {
-        "description": "📚 **Введение в Python**\nPython — это мощный, простой в изучении язык программирования.",
-        "file": "./files/4.docx"
+        "text": "📚 **Введение в Python**\nPython — это мощный, простой в изучении язык программирования.",
+        "file": "files/3.docx",
     },
     "Переменные и типы данных": {
-        "description": "📚 **Переменные и типы данных**\nРассматриваем основные типы данных в Python.",
-        "file": "./files/4.docx"
+        "text": "📚 **Переменные и типы данных**\nРассматриваем основные типы данных в Python.",
+        "file": "files/4.docx",
     },
+  
 }
 
-# Данные для лабораторных и файлы к ним
+# Данные для лабораторных
 LAB_TOPICS = {
     "Установка Python": {
-        "description": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
-        "file": "./files/4.docx"
+        "text": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
+        "file": "files/2.docx",
     },
     "Простые программы": {
-        "description": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
-        "file": "./files/4.docx"
+        "text": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
+        "file": "files/3.pptx",
     },
-   
+    
 }
-
 
 # Главное меню с кнопками
 async def start(update: Update, context: CallbackContext) -> None:
@@ -44,6 +44,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные темы")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
 # Обработчик выбора раздела
@@ -63,38 +64,52 @@ async def menu_handler(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("🛠 Выберите лабораторную тему:", reply_markup=reply_markup)
 
     elif text in LECTURE_TOPICS:
-        lecture = LECTURE_TOPICS[text]
-        keyboard = [[KeyboardButton(f"📂 Скачать {text}")], [KeyboardButton("⬅ Назад")]]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text(lecture["description"], reply_markup=reply_markup)
+        topic = LECTURE_TOPICS[text]
+        file_path = topic["file"]
+
+        keyboard = [[InlineKeyboardButton("📂 Скачать материал", callback_data=f"download:{file_path}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(topic["text"], reply_markup=reply_markup)
 
     elif text in LAB_TOPICS:
-        lab = LAB_TOPICS[text]
-        keyboard = [[KeyboardButton(f"📂 Скачать {text}")], [KeyboardButton("⬅ Назад")]]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text(lab["description"], reply_markup=reply_markup)
+        topic = LAB_TOPICS[text]
+        file_path = topic["file"]
 
-    elif text.startswith("📂 Скачать"):
-        topic = text.replace("📂 Скачать ", "")
-        if topic in LECTURE_TOPICS:
-            file_path = LECTURE_TOPICS[topic]["file"]
-        elif topic in LAB_TOPICS:
-            file_path = LAB_TOPICS[topic]["file"]
-        else:
-            await update.message.reply_text("⚠ Файл не найден.")
-            return
+        keyboard = [[InlineKeyboardButton("📂 Скачать материал", callback_data=f"download:{file_path}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-        if os.path.exists(file_path):
-            await update.message.reply_document(InputFile(file_path))
-        else:
-            await update.message.reply_text("⚠ Файл не найден.")
+        await update.message.reply_text(topic["text"], reply_markup=reply_markup)
 
     elif text == "⬅ Назад":
         await start(update, context)
 
+# Обработчик скачивания файлов
+async def download_file(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    file_path = query.data.split(":")[1]
+
+    if os.path.exists(file_path):
+        await query.message.reply_document(InputFile(file_path))
+    else:
+        await query.message.reply_text("⚠ Файл не найден.")
+
 # Добавляем обработчики команд
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_handler))
+app.add_handler(CallbackQueryHandler(download_file))
 
 # Запуск бота
 if __name__ == "__main__":
