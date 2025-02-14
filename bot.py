@@ -21,7 +21,7 @@ async def start(update: Update, context: CallbackContext) -> None:
   
 # Команда /tema  
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('1-Тема',/n,'2-тема','3-тема')
+    await update.message.reply_text('1-Тема')
 # Эхо-ответ на сообщения
 async def echo(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(update.message.text)
