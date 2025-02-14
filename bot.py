@@ -1,7 +1,7 @@
 import os
 import logging
-from telegram import Update,ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
 
 # Включаем логирование
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -12,25 +12,51 @@ TOKEN = os.getenv("TOKEN")
 # Создаем объект бота
 app = Application.builder().token(TOKEN).build()
 
-keyboard = [["Лекционная тема"]]
-reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+# Данные для кнопок
+LECTURE_TOPICS = [
+    "1. Введение в Python",
+    "2. Переменные и типы данных",
+    "3. Условные конструкции",
+    "4. Циклы",
+    "5. Функции",
+    "6. Работа с файлами",
+]
 
-# Команда /start
+LAB_TOPICS = [
+    "1. Установка Python и настройка среды",
+    "2. Простые программы на Python",
+    "3. Работа со строками и списками",
+    "4. Написание функций",
+    "5. Основы ООП",
+    "6. Работа с БД (SQLite)",
+]
+
+# Главное меню
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Я твой Telegram-бот.", reply_markup=reply_markup)
-  
-# Команда /tema  
-async def tema(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('1-Тема')
-# Эхо-ответ на сообщения
-async def echo(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text(update.message.text)
+    keyboard = [
+        [InlineKeyboardButton("📚 Лекционные темы", callback_data="lectures")],
+        [InlineKeyboardButton("🛠 Лабораторные темы", callback_data="labs")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
+# Обработчик кнопок
+async def button_handler(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "lectures":
+        text = "📚 **Лекционные темы:**\n\n" + "\n".join(LECTURE_TOPICS)
+    elif query.data == "labs":
+        text = "🛠 **Лабораторные работы:**\n\n" + "\n".join(LAB_TOPICS)
+    else:
+        text = "Ошибка: неизвестная команда."
+
+    await query.edit_message_text(text=text)
 
 # Добавляем обработчики команд
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("^Лекционная тема$", tema))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+app.add_handler(CallbackQueryHandler(button_handler))
 
 # Запуск бота
 if __name__ == "__main__":
