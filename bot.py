@@ -12,16 +12,24 @@ TOKEN = os.getenv("TOKEN")
 # Создаем объект бота
 app = Application.builder().token(TOKEN).build()
 
+keyboard = [["Лекционная тема"]]
+reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
 # Команда /start
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Привет! Я твой Telegram-бот.")
-
+    await update.message.reply_text("Я твой Telegram-бот.")
+  
+# Команда /tema  
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text('1-Тема',/n,'2-тема','3-тема')
 # Эхо-ответ на сообщения
 async def echo(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(update.message.text)
 
+
 # Добавляем обработчики команд
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("Лекционная тема", tema))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 # Запуск бота
