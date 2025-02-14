@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update
+from telegram import Update,ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # Включаем логирование
