@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 # Получаем токен из переменных окружения
-TOKEN = os.getenv("8088305768:AAEOB7f893L-57dADMyAh32gTApX8iPgFY8")
+TOKEN = os.getenv("TOKEN")
 
 # Создаем объект бота
 app = Application.builder().token(TOKEN).build()
