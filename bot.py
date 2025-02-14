@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
 
 # Включаем логирование
@@ -12,31 +12,45 @@ TOKEN = os.getenv("TOKEN")
 # Создаем объект бота
 app = Application.builder().token(TOKEN).build()
 
-# Данные для лекций
+# Данные для лекций и файлы к ним
 LECTURE_TOPICS = {
-    "Введение в Python": "📚 **Введение в Python**\nPython — это мощный, простой в изучении язык программирования.",
-    "Переменные и типы данных": "📚 **Переменные и типы данных**\nРассматриваем основные типы данных в Python.",
-    "Условные конструкции": "📚 **Условные конструкции**\nКак использовать `if`, `elif`, `else` в Python.",
+    "Введение в Python": {
+        "description": "📚 **Введение в Python**\nPython — это мощный, простой в изучении язык программирования.",
+        "file": "files/lecture1.pdf"
+    },
+    "Переменные и типы данных": {
+        "description": "📚 **Переменные и типы данных**\nРассматриваем основные типы данных в Python.",
+        "file": "files/lecture2.pdf"
+    },
+    "Условные конструкции": {
+        "description": "📚 **Условные конструкции**\nКак использовать `if`, `elif`, `else` в Python.",
+        "file": "files/lecture3.pdf"
+    }
 }
 
-# Данные для лабораторных
+# Данные для лабораторных и файлы к ним
 LAB_TOPICS = {
-    "Установка Python": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
-    "Простые программы": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
-    "Работа со строками": "🛠 **Работа со строками и списками**\nУчимся манипулировать данными в Python.",
+    "Установка Python": {
+        "description": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
+        "file": "files/lab1.zip"
+    },
+    "Простые программы": {
+        "description": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
+        "file": "files/lab2.zip"
+    },
+    "Работа со строками": {
+        "description": "🛠 **Работа со строками и списками**\nУчимся манипулировать данными в Python.",
+        "file": "files/lab3.zip"
+    }
 }
-CRC_TOPICS = {
-    "Ljas": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
-    "Простые программы": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
-    "Работа со строками": "🛠 **Работа со строками и списками**\nУчимся манипулировать данными в Python.",
-}
+
+
 # Главное меню с кнопками
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные темы"),KeyboardButton("🛠 СРС темы")]
+        [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные темы")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
 # Обработчик выбора раздела
@@ -54,20 +68,33 @@ async def menu_handler(update: Update, context: CallbackContext) -> None:
         keyboard.append([KeyboardButton("⬅ Назад")])
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         await update.message.reply_text("🛠 Выберите лабораторную тему:", reply_markup=reply_markup)
-    
-    elif text == "🛠 СРС темы":
-        keyboard = [[KeyboardButton(topic)] for topic in CRC_TOPICS.keys()]
-        keyboard.append([KeyboardButton("⬅ Назад")])
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text("🛠 Выберите СРС тему:", reply_markup=reply_markup)
 
     elif text in LECTURE_TOPICS:
-        await update.message.reply_text(LECTURE_TOPICS[text])
+        lecture = LECTURE_TOPICS[text]
+        keyboard = [[KeyboardButton(f"📂 Скачать {text}")], [KeyboardButton("⬅ Назад")]]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        await update.message.reply_text(lecture["description"], reply_markup=reply_markup)
 
     elif text in LAB_TOPICS:
-        await update.message.reply_text(LAB_TOPICS[text])
-    elif text in CRC_TOPICS:
-        await update.message.reply_text(CRC_TOPICS[text])
+        lab = LAB_TOPICS[text]
+        keyboard = [[KeyboardButton(f"📂 Скачать {text}")], [KeyboardButton("⬅ Назад")]]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        await update.message.reply_text(lab["description"], reply_markup=reply_markup)
+
+    elif text.startswith("📂 Скачать"):
+        topic = text.replace("📂 Скачать ", "")
+        if topic in LECTURE_TOPICS:
+            file_path = LECTURE_TOPICS[topic]["file"]
+        elif topic in LAB_TOPICS:
+            file_path = LAB_TOPICS[topic]["file"]
+        else:
+            await update.message.reply_text("⚠ Файл не найден.")
+            return
+
+        if os.path.exists(file_path):
+            await update.message.reply_document(InputFile(file_path))
+        else:
+            await update.message.reply_text("⚠ Файл не найден.")
 
     elif text == "⬅ Назад":
         await start(update, context)
