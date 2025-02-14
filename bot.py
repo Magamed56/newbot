@@ -25,7 +25,11 @@ LAB_TOPICS = {
     "Простые программы": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
     "Работа со строками": "🛠 **Работа со строками и списками**\nУчимся манипулировать данными в Python.",
 }
-
+CRC_TOPICS = {
+    "Ljas": "🛠 **Установка Python и настройка среды**\nГде скачать Python и как его установить.",
+    "Простые программы": "🛠 **Простые программы на Python**\nПишем первые программы с `print()` и `input()`.",
+    "Работа со строками": "🛠 **Работа со строками и списками**\nУчимся манипулировать данными в Python.",
+}
 # Главное меню с кнопками
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
@@ -50,12 +54,20 @@ async def menu_handler(update: Update, context: CallbackContext) -> None:
         keyboard.append([KeyboardButton("⬅ Назад")])
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         await update.message.reply_text("🛠 Выберите лабораторную тему:", reply_markup=reply_markup)
+    
+    elif text == "🛠 СРС Темы":
+        keyboard = [[KeyboardButton(topic)] for topic in CRC_TOPICS.keys()]
+        keyboard.append([KeyboardButton("⬅ Назад")])
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        await update.message.reply_text("🛠 Выберите СРС тему:", reply_markup=reply_markup)
 
     elif text in LECTURE_TOPICS:
         await update.message.reply_text(LECTURE_TOPICS[text])
 
     elif text in LAB_TOPICS:
         await update.message.reply_text(LAB_TOPICS[text])
+    elif text in CRC_TOPICS:
+        await update.message.reply_text(CRC_TOPICS[text])
 
     elif text == "⬅ Назад":
         await start(update, context)
