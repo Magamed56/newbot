@@ -17,10 +17,10 @@ reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyb
 
 # Команда /start
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Я твой Telegram-бот.")
+    await update.message.reply_text("Я твой Telegram-бот.", reply_markup=reply_markup)
   
 # Команда /tema  
-async def start(update: Update, context: CallbackContext) -> None:
+async def tema(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text('1-Тема')
 # Эхо-ответ на сообщения
 async def echo(update: Update, context: CallbackContext) -> None:
