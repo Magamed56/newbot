@@ -59,3 +59,4 @@ app.add_handler(MessageHandler(filters.Regex("^Показать темы$"), get
 app.add_handler(conv_handler)
 
 app.run_polling()
+worker: python bot.py
