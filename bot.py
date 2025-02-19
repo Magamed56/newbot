@@ -73,7 +73,7 @@ async def show_task(update: Update, context: CallbackContext) -> None:
     if task["days_left"] > 0:
         await update.message.reply_text(f"⏳ Доступно через {task['days_left']} дней.")
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
+        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка на тему]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
 
 # Настройка бота
