@@ -42,15 +42,15 @@ srs_topics = [
 # Подключение к базе данных PostgreSQL
 async def create_db():
     conn = await asyncpg.connect(
-        user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
+        user=os.getenv('PG_USER'),
+        password=os.getenv('PG_PASSWORD'),
+        database=os.getenv('PG_DATABASE'),
+        host=os.getenv('PG_HOST'),
+        port=os.getenv('PG_PORT')
     )
     
     await conn.execute('''
-        CREATE TABLE IF NOT EXISTS topics (
+        CREATE TABLE IF NOT EXISTS srs_topics (
             id SERIAL PRIMARY KEY,
             name TEXT UNIQUE,
             user TEXT
@@ -61,11 +61,11 @@ async def create_db():
 # Функция для добавления/обновления выбранной темы
 async def select_topic(topic, user):
     conn = await asyncpg.connect(
-        user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
+        user=os.getenv('PG_USER'),
+        password=os.getenv('PG_PASSWORD'),
+        database=os.getenv('PG_DATABASE'),
+        host=os.getenv('PG_HOST'),
+        port=os.getenv('PG_PORT')
     )
 
     result = await conn.fetch("SELECT * FROM srs_topics WHERE name = $1", topic)
@@ -82,11 +82,11 @@ async def select_topic(topic, user):
 # Функция для получения всех выбранных тем
 async def get_selected_topics():
     conn = await asyncpg.connect(
-       user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
+        user=os.getenv('PG_USER'),
+        password=os.getenv('PG_PASSWORD'),
+        database=os.getenv('PG_DATABASE'),
+        host=os.getenv('PG_HOST'),
+        port=os.getenv('PG_PORT')
     )
     
     rows = await conn.fetch("SELECT name, user FROM srs_topics")
@@ -191,4 +191,5 @@ app.add_handler(MessageHandler(filters.TEXT & filters.Regex(".*"), select_srs_to
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
+
 
