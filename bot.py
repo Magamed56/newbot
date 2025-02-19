@@ -8,90 +8,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 
-# Подключение к базе данных PostgreSQL
-async def create_db():
-    conn = await asyncpg.connect(
-        user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
-    )
-    
-    await conn.execute('''
-        CREATE TABLE IF NOT EXISTS topics (
-            id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE,
-            user TEXT
-        )
-    ''')
-    await conn.close()
-
-# Функция для добавления/обновления выбранной темы
-async def select_topic(topic, user):
-    conn = await asyncpg.connect(
-         user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
-    )
-
-    result = await conn.fetch("SELECT * FROM topics WHERE name = $1", topic)
-    
-    if result:
-        await conn.execute("UPDATE topics SET user = $1 WHERE name = $2", user, topic)
-    else:
-        await conn.execute("INSERT INTO topics (name, user) VALUES ($1, $2)", topic, user)
-
-    await conn.close()
-
-# Функция для получения всех выбранных тем
-async def get_selected_topics():
-    conn = await asyncpg.connect(
-         user=os.getenv('postgres'),
-        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
-        database=os.getenv('railway'),
-        host=os.getenv('postgres.railway.internal'),
-        port=os.getenv('5432')
-    )
-    
-    rows = await conn.fetch("SELECT name, user FROM topics")
-    await conn.close()
-    return rows
-
-# Функция загрузки данных из Google Sheets
-def get_tasks(task_type):
-    url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
-    
-    try:
-        df = pd.read_csv(url)  # Загружаем таблицу
-    except Exception as e:
-        print(f"Ошибка загрузки таблицы: {e}")
-        return {}
-
-    today = datetime.date.today()
-    tasks = {}
-
-    for _, row in df.iterrows():
-        if str(row.get("Тип", "")).strip() == task_type:
-            unlock_date_str = str(row.get("Дата разблокировки", "")).strip()
-
-            try:
-                unlock_date = datetime.datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
-                days_left = (unlock_date - today).days
-            except ValueError:
-                continue  # Пропустить, если дата неправильная
-
-            tasks[row["Название"]] = {
-                "description": row.get("Описание", "Нет описания"),
-                "link": row.get("Ссылка", "#"),
-                "unlock_date": unlock_date,
-                "days_left": days_left
-            }
-
-    return tasks
-
 # Список тем для СРС
 srs_topics = [
     "Блог с возможностью комментариев", "Онлайн-магазин", "Система бронирования", "Веб-сайт для портфолио",
@@ -123,15 +39,93 @@ srs_topics = [
     "Сайт для получения информации о здоровье", "Платформа для организации онлайн-курсов по кулинарии"
 ]
 
+# Подключение к базе данных PostgreSQL
+async def create_db():
+    conn = await asyncpg.connect(
+        user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
+    )
+    
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS topics (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE,
+            user TEXT
+        )
+    ''')
+    await conn.close()
+
+# Функция для добавления/обновления выбранной темы
+async def select_topic(topic, user):
+    conn = await asyncpg.connect(
+        user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
+    )
+
+    result = await conn.fetch("SELECT * FROM srs_topics WHERE name = $1", topic)
+    
+    if result:
+        # Обновляем выбранного пользователя для этой темы
+        await conn.execute("UPDATE srs_topics SET user = $1 WHERE name = $2", user, topic)
+    else:
+        # Если тема не была выбрана ранее, добавляем её
+        await conn.execute("INSERT INTO srs_topics (name, user) VALUES ($1, $2)", topic, user)
+
+    await conn.close()
+
+# Функция для получения всех выбранных тем
+async def get_selected_topics():
+    conn = await asyncpg.connect(
+       user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
+    )
+    
+    rows = await conn.fetch("SELECT name, user FROM srs_topics")
+    await conn.close()
+    return rows
+
 # Функция отображения тем СРС
 async def show_srs_topics(update: Update, context: CallbackContext) -> None:
     keyboard = []
+    
     for topic in srs_topics:
-        keyboard.append([KeyboardButton(topic)])
+        # Проверим, есть ли уже кто-то, кто выбрал эту тему
+        selected_topics = await get_selected_topics()
+        selected_by = next((item['user'] for item in selected_topics if item['name'] == topic), "Свободно")
+        
+        if selected_by == "Свободно":
+            keyboard.append([KeyboardButton(f"{topic} (Свободно)")])
+        else:
+            keyboard.append([KeyboardButton(f"{topic} (Выбрано: {selected_by})")])
 
     keyboard.append([KeyboardButton("⬅ Назад")])
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите тему СРС:", reply_markup=reply_markup)
+
+# Функция для обработки выбора темы СРС
+async def select_srs_topic(update: Update, context: CallbackContext) -> None:
+    topic = update.message.text.replace(" (Свободно)", "").replace(" (Выбрано: ", "").replace(")", "")
+    
+    # Проверяем, свободна ли тема
+    selected_topics = await get_selected_topics()
+    selected_by = next((item['user'] for item in selected_topics if item['name'] == topic), None)
+    
+    if selected_by is None:
+        # Если тема свободна, сохраняем её как выбранную для текущего пользователя
+        await select_topic(topic, update.message.from_user.username)
+        await update.message.reply_text(f"Вы выбрали тему: {topic}")
+    else:
+        # Если уже выбран другой пользователь
+        await update.message.reply_text(f"Эта тема уже выбрана пользователем: {selected_by}. Вы можете выбрать другую.")
 
 # Главное меню
 async def start(update: Update, context: CallbackContext) -> None:
@@ -192,9 +186,9 @@ app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 Лекцион
 app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 СРС"), show_srs_topics))
 app.add_handler(MessageHandler(filters.TEXT & filters.Regex("⬅ Назад"), start))
 app.add_handler(MessageHandler(filters.TEXT, show_task))
+app.add_handler(MessageHandler(filters.TEXT & filters.Regex(".*"), select_srs_topic))
 
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
-
 
