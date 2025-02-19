@@ -57,6 +57,10 @@ async def show_topics(update: Update, context: CallbackContext) -> None:
 
 # Показывает выбранную тему
 async def show_task(update: Update, context: CallbackContext) -> None:
+    if update.message.text == "⬅ Назад":
+        await start(update, context)
+        return
+
     task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из текста кнопки
     
     tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
