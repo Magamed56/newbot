@@ -11,11 +11,11 @@ SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 # Подключение к базе данных PostgreSQL
 async def create_db():
     conn = await asyncpg.connect(
-        user=os.getenv('PGUSER'),
-        password=os.getenv('POSTGRES_PASSWORD'),
-        database=os.getenv('RAILWAY_TCP_PROXY_DOMAIN'),
-        host=os.getenv('RAILWAY_TCP_PROXY_PORT'),
-        port=os.getenv('PGDATABASE')
+        user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
     )
     
     await conn.execute('''
