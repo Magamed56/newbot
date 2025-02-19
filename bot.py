@@ -30,11 +30,11 @@ async def create_db():
 # Функция для добавления/обновления выбранной темы
 async def select_topic(topic, user):
     conn = await asyncpg.connect(
-        user=os.getenv('PG_USER'),
-        password=os.getenv('PG_PASSWORD'),
-        database=os.getenv('PG_DATABASE'),
-        host=os.getenv('PG_HOST'),
-        port=os.getenv('PG_PORT')
+         user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
     )
 
     result = await conn.fetch("SELECT * FROM topics WHERE name = $1", topic)
@@ -49,11 +49,11 @@ async def select_topic(topic, user):
 # Функция для получения всех выбранных тем
 async def get_selected_topics():
     conn = await asyncpg.connect(
-        user=os.getenv('PG_USER'),
-        password=os.getenv('PG_PASSWORD'),
-        database=os.getenv('PG_DATABASE'),
-        host=os.getenv('PG_HOST'),
-        port=os.getenv('PG_PORT')
+         user=os.getenv('postgres'),
+        password=os.getenv('uimjlHThyHwgIhgXFGBzOKptPVBeBZCk'),
+        database=os.getenv('railway'),
+        host=os.getenv('postgres.railway.internal'),
+        port=os.getenv('5432')
     )
     
     rows = await conn.fetch("SELECT name, user FROM topics")
@@ -122,6 +122,16 @@ srs_topics = [
     "Платформа для создания опросников", "Приложение для подсчёта голосов", "Система для расчёта налога на имущество",
     "Сайт для получения информации о здоровье", "Платформа для организации онлайн-курсов по кулинарии"
 ]
+
+# Функция отображения тем СРС
+async def show_srs_topics(update: Update, context: CallbackContext) -> None:
+    keyboard = []
+    for topic in srs_topics:
+        keyboard.append([KeyboardButton(topic)])
+
+    keyboard.append([KeyboardButton("⬅ Назад")])
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Выберите тему СРС:", reply_markup=reply_markup)
 
 # Главное меню
 async def start(update: Update, context: CallbackContext) -> None:
