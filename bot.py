@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 
+
 # Функция загрузки данных из таблицы
 def get_tasks(task_type):
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
@@ -37,7 +38,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
-# Показывает список тем внизу
+# Показывает список тем
 async def show_topics(update: Update, context: CallbackContext) -> None:
     task_type = "Лекция" if update.message.text == "📚 Лекционные темы" else "Лабораторная"
     tasks = get_tasks(task_type)
@@ -61,8 +62,7 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         await start(update, context)
         return
 
-    task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из текста кнопки
-    
+    task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из кнопки
     tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
     task = tasks.get(task_name)
 
@@ -71,9 +71,10 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         return
 
     if task["days_left"] > 0:
-        await update.message.reply_text(f"⏳ Доступно через {task['days_left']} дней.")
+        await update.message.reply_text(f"⛔ Тема \"{task_name}\" пока недоступна.\n"
+                                        f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней).")
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка на тему]({task['link']})"
+        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
 
 # Настройка бота
