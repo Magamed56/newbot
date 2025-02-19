@@ -1,9 +1,11 @@
+
 import os
 import pandas as pd
 import sqlite3
 import datetime
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
+
 
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
@@ -147,7 +149,14 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Тема не найдена.")
         return
 
-    await update.message.reply_text(f"Тема: {task_name}\nОписание: {task['description']}\nСсылка: {task['link']}")
+    if task["days_left"] > 0:
+        await update.message.reply_text(
+            f"⛔ Тема \"{task_name}\" пока недоступна.\n"
+            f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
+        )
+    else:
+        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
+        await update.message.reply_text(text, parse_mode="Markdown")
 
 # Показывает темы для СРС
 async def show_srs_topics(update: Update, context: CallbackContext) -> None:
@@ -190,4 +199,5 @@ app.add_handler(MessageHandler(filters.TEXT, handle_srs_selection))
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
+
 
