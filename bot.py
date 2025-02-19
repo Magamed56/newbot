@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 import os
 
 # Получаем URL подключения к базе данных из переменных окружения (Railway предоставляет это)
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv('postgresql://postgres:LEcsPYdsrVvQaYhsEoNyupPWzsxNkEKd@crossover.proxy.rlwy.net:30056/railway')
 
 # Авторизация для работы с Google Sheets
 def authenticate_google_sheets():
