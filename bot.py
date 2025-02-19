@@ -7,23 +7,32 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 
-
 # Функция загрузки данных из таблицы
 def get_tasks(task_type):
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
-    df = pd.read_csv(url)  # Загружаем таблицу
+    
+    try:
+        df = pd.read_csv(url)  # Загружаем таблицу
+    except Exception as e:
+        print(f"Ошибка загрузки таблицы: {e}")
+        return {}
 
     today = datetime.date.today()
     tasks = {}
 
     for _, row in df.iterrows():
-        if row["Тип"] == task_type:
-            unlock_date = datetime.datetime.strptime(row["Дата разблокировки"], "%Y-%m-%d").date()
-            days_left = (unlock_date - today).days
+        if str(row.get("Тип", "")).strip() == task_type:
+            unlock_date_str = str(row.get("Дата разблокировки", "")).strip()
+
+            try:
+                unlock_date = datetime.datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
+                days_left = (unlock_date - today).days
+            except ValueError:
+                continue  # Пропустить, если дата неправильная
 
             tasks[row["Название"]] = {
-                "description": row["Описание"],
-                "link": row["Ссылка"],
+                "description": row.get("Описание", "Нет описания"),
+                "link": row.get("Ссылка", "#"),
                 "unlock_date": unlock_date,
                 "days_left": days_left
             }
@@ -71,8 +80,10 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         return
 
     if task["days_left"] > 0:
-        await update.message.reply_text(f"⛔ Тема \"{task_name}\" пока недоступна.\n"
-                                        f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней).")
+        await update.message.reply_text(
+            f"⛔ Тема \"{task_name}\" пока недоступна.\n"
+            f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
+        )
     else:
         text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
@@ -86,3 +97,4 @@ app.add_handler(MessageHandler(filters.TEXT, show_task))
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
+
