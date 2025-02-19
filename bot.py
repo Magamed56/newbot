@@ -1,100 +1,149 @@
-import os
-import pandas as pd
-import datetime
+import gspread
+import psycopg2
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
+import os
 
-# ID Google Таблицы
-SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
+# Получаем URL подключения к базе данных из переменных окружения (Railway предоставляет это)
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-# Функция загрузки данных из таблицы
-def get_tasks(task_type):
-    url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
-    
-    try:
-        df = pd.read_csv(url)  # Загружаем таблицу
-    except Exception as e:
-        print(f"Ошибка загрузки таблицы: {e}")
-        return {}
+# Авторизация для работы с Google Sheets
+def authenticate_google_sheets():
+    client = gspread.service_account(filename='credentials.json')
+    sheet = client.open_by_url('https://docs.google.com/spreadsheets/d/1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw')
+    return sheet
 
-    today = datetime.date.today()
-    tasks = {}
+# Получаем данные из Google Sheets для Лекций и Лабораторных
+def get_lecture_data():
+    sheet = authenticate_google_sheets()
+    worksheet = sheet.get_worksheet(0)  # Получаем первый лист (можно изменить)
+    return worksheet.get_all_records()  # Все записи
 
-    for _, row in df.iterrows():
-        if str(row.get("Тип", "")).strip() == task_type:
-            unlock_date_str = str(row.get("Дата разблокировки", "")).strip()
+def get_lab_data():
+    sheet = authenticate_google_sheets()
+    worksheet = sheet.get_worksheet(1)  # Получаем второй лист (можно изменить)
+    return worksheet.get_all_records()
 
-            try:
-                unlock_date = datetime.datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
-                days_left = (unlock_date - today).days
-            except ValueError:
-                continue  # Пропустить, если дата неправильная
+# Настройка базы данных и таблиц на Railway (PostgreSQL)
+def create_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
 
-            tasks[row["Название"]] = {
-                "description": row.get("Описание", "Нет описания"),
-                "link": row.get("Ссылка", "#"),
-                "unlock_date": unlock_date,
-                "days_left": days_left
-            }
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS srs_topics (
+            id SERIAL PRIMARY KEY,
+            topic_name TEXT NOT NULL,
+            user_name TEXT,
+            is_taken BOOLEAN NOT NULL DEFAULT FALSE
+        )
+    ''')
 
-    return tasks
+    conn.commit()
+    conn.close()
 
-# Главное меню
+# Добавление темы в базу данных (для СРС)
+def add_srs_topic(topic_name):
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO srs_topics (topic_name, is_taken) VALUES (%s, %s)", (topic_name, False))
+    conn.commit()
+    conn.close()
+
+# Получение всех доступных СРС тем
+def get_srs_topics():
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, topic_name, user_name, is_taken FROM srs_topics")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+# Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [KeyboardButton("📚 Лекционные темы"), KeyboardButton("🛠 Лабораторные работы")],
+        [KeyboardButton("Лекции")],
+        [KeyboardButton("Лабораторные")],
+        [KeyboardButton("СРС (Django проекты)")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
-# Показывает список тем
-async def show_topics(update: Update, context: CallbackContext) -> None:
-    task_type = "Лекция" if update.message.text == "📚 Лекционные темы" else "Лабораторная"
-    tasks = get_tasks(task_type)
-
-    if not tasks:
-        await update.message.reply_text("Нет доступных тем.")
-        return
-
+# Функция для отображения лекций
+async def show_lectures(update: Update, context: CallbackContext) -> None:
+    lectures = get_lecture_data()
     keyboard = []
-    for name, details in tasks.items():
-        text = f"{name} (⏳ {details['days_left']} дн.)" if details["days_left"] > 0 else name
+    for lecture in lectures:
+        topic_name = lecture['Тема']
+        available_at = lecture['Дата']
+        link = lecture['Ссылка']
+        text = f"{topic_name} - Доступна с {available_at} \nСсылка: {link}"
         keyboard.append([KeyboardButton(text)])
 
     keyboard.append([KeyboardButton("⬅ Назад")])
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(f"📜 {task_type}:", reply_markup=reply_markup)
+    await update.message.reply_text("Выберите лекцию:", reply_markup=reply_markup)
 
-# Показывает выбранную тему
-async def show_task(update: Update, context: CallbackContext) -> None:
-    if update.message.text == "⬅ Назад":
-        await start(update, context)
-        return
+# Функция для отображения лабораторных заданий
+async def show_labs(update: Update, context: CallbackContext) -> None:
+    labs = get_lab_data()
+    keyboard = []
+    for lab in labs:
+        topic_name = lab['Тема']
+        available_at = lab['Дата']
+        link = lab['Ссылка']
+        text = f"{topic_name} - Доступно с {available_at} \nСсылка: {link}"
+        keyboard.append([KeyboardButton(text)])
 
-    task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из кнопки
-    tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
-    task = tasks.get(task_name)
+    keyboard.append([KeyboardButton("⬅ Назад")])
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Выберите лабораторное задание:", reply_markup=reply_markup)
 
-    if not task:
-        await update.message.reply_text("Тема не найдена.")
-        return
+# Функция для отображения выбора СРС тем
+async def show_srs_topics(update: Update, context: CallbackContext) -> None:
+    topics = get_srs_topics()
+    keyboard = []
+    for topic in topics:
+        topic_name = topic[1]
+        user_name = topic[2] if topic[2] else "Не выбрана"
+        text = f"{topic_name} - {user_name}"
+        keyboard.append([KeyboardButton(text)])
 
-    if task["days_left"] > 0:
-        await update.message.reply_text(
-            f"⛔ Тема \"{task_name}\" пока недоступна.\n"
-            f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
-        )
+    keyboard.append([KeyboardButton("⬅ Назад")])
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("Выберите тему для СРС:", reply_markup=reply_markup)
+
+# Функция для выбора СРС темы
+async def select_srs_topic(update: Update, context: CallbackContext) -> None:
+    selected_topic = update.message.text
+    user_name = update.message.from_user.first_name
+
+    # Проверяем, была ли тема уже выбрана
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM srs_topics WHERE topic_name = %s", (selected_topic,))
+    row = cursor.fetchone()
+    
+    if row and row[3]:  # Проверяем, была ли тема выбрана
+        await update.message.reply_text(f"Тема \"{selected_topic}\" уже выбрана пользователем {row[2]}.")
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
-        await update.message.reply_text(text, parse_mode="Markdown")
+        cursor.execute("UPDATE srs_topics SET user_name = %s, is_taken = TRUE WHERE topic_name = %s", (user_name, selected_topic))
+        conn.commit()
+        await update.message.reply_text(f"Вы выбрали тему: \"{selected_topic}\".")
+    conn.close()
 
 # Настройка бота
-app = Application.builder().token(os.getenv("TOKEN")).build()
+app = Application.builder().token("8088305768:AAEOB7f893L-57dADMyAh32gTApX8iPgFY8").build()
+
+# Создание базы данных и таблиц при запуске
+create_db()
+
+# Регистрируем обработчики команд
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 Лекционные темы|🛠 Лабораторные работы"), show_topics))
-app.add_handler(MessageHandler(filters.TEXT, show_task))
+app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Лекции"), show_lectures))
+app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Лабораторные"), show_labs))
+app.add_handler(MessageHandler(filters.TEXT & filters.Regex("СРС (Django проекты)"), show_srs_topics))
+app.add_handler(MessageHandler(filters.TEXT, select_srs_topic))
 
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
-
