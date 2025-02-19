@@ -5,7 +5,7 @@ from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
 
 # ID Google Таблицы
-SPREADSHEET_ID = "1AbCDEfgHIjKlMNO-PQrsTUVWXYZ"
+SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 
 # Функция загрузки данных из таблицы
 def get_tasks(task_type):
@@ -85,7 +85,7 @@ async def show_task(update: Update, context: CallbackContext) -> None:
             f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
         )
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
+        text = f"📌 *{task_name}*\n{task['description']}\n[Вот вм ссылка]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
 
 # Настройка бота
