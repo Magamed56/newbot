@@ -7,6 +7,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
 
+
+
 # Функция загрузки данных из таблицы
 def get_tasks(task_type):
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
@@ -58,7 +60,11 @@ async def show_topics(update: Update, context: CallbackContext) -> None:
 
     keyboard = []
     for name, details in tasks.items():
-        text = f"{name} (⏳ {details['days_left']} дн.)" if details["days_left"] > 0 else name
+        # Если тема недоступна, показываем количество дней до доступности
+        if details["days_left"] > 0:
+            text = f"{name} (⏳ {details['days_left']} дн.)"
+        else:
+            text = name
         keyboard.append([KeyboardButton(text)])
 
     keyboard.append([KeyboardButton("⬅ Назад")])
@@ -72,20 +78,21 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         return
 
     task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из кнопки
-    tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
+    tasks = {**get_tasks("Лекция"), **get_tasks("Лабораторная")}  # Объединяем лекции и лабораторные
     task = tasks.get(task_name)
 
     if not task:
         await update.message.reply_text("Тема не найдена.")
         return
 
+    # Если тема еще не доступна
     if task["days_left"] > 0:
         await update.message.reply_text(
             f"⛔ Тема \"{task_name}\" пока недоступна.\n"
             f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
         )
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Вот вм ссылка]({task['link']})"
+        text = f"📌 *{task_name}*\n{task['description']}\n[Вот вам ссылка]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
 
 # Настройка бота
@@ -97,3 +104,5 @@ app.add_handler(MessageHandler(filters.TEXT, show_task))
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
+
+
