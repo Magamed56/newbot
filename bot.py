@@ -42,11 +42,11 @@ srs_topics = [
 # Подключение к базе данных PostgreSQL
 async def create_db():
     conn = await asyncpg.connect(
-        user=os.getenv('PG_USER'),
-        password=os.getenv('PG_PASSWORD'),
-        database=os.getenv('PG_DATABASE'),
-        host=os.getenv('PG_HOST'),
-        port=os.getenv('PG_PORT')
+        user=os.getenv('PGUSER'),
+        password=os.getenv('PGPASSWORD'),
+        database=os.getenv('PGDATABASE'),
+        host=os.getenv('PGHOST'),
+        port=os.getenv('PGPORT')
     )
     
     await conn.execute('''
@@ -61,11 +61,11 @@ async def create_db():
 # Функция для добавления/обновления выбранной темы
 async def select_topic(topic, user):
     conn = await asyncpg.connect(
-        user=os.getenv('PG_USER'),
-        password=os.getenv('PG_PASSWORD'),
-        database=os.getenv('PG_DATABASE'),
-        host=os.getenv('PG_HOST'),
-        port=os.getenv('PG_PORT')
+        user=os.getenv('PGUSER'),
+        password=os.getenv('PGPASSWORD'),
+        database=os.getenv('PGDATABASE'),
+        host=os.getenv('PGHOST'),
+        port=os.getenv('PGPORT')
     )
 
     result = await conn.fetch("SELECT * FROM srs_topics WHERE name = $1", topic)
@@ -82,11 +82,11 @@ async def select_topic(topic, user):
 # Функция для получения всех выбранных тем
 async def get_selected_topics():
     conn = await asyncpg.connect(
-        user=os.getenv('PG_USER'),
-        password=os.getenv('PG_PASSWORD'),
-        database=os.getenv('PG_DATABASE'),
-        host=os.getenv('PG_HOST'),
-        port=os.getenv('PG_PORT')
+        user=os.getenv('PGUSER'),
+        password=os.getenv('PGPASSWORD'),
+        database=os.getenv('PGDATABASE'),
+        host=os.getenv('PGHOST'),
+        port=os.getenv('PGPORT')
     )
     
     rows = await conn.fetch("SELECT name, user FROM srs_topics")
