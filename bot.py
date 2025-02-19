@@ -1,34 +1,37 @@
 import gspread
-import psycopg2
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
+import psycopg2
 import os
 
-# Получаем URL подключения к базе данных из переменных окружения (Railway предоставляет это)
-DATABASE_URL = os.getenv('postgresql://postgres:LEcsPYdsrVvQaYhsEoNyupPWzsxNkEKd@crossover.proxy.rlwy.net:30056/railway')
+# Подключение к базе данных PostgreSQL (из Railway)
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-# Авторизация для работы с Google Sheets
+# Функция для подключения к Google Sheets
 def authenticate_google_sheets():
-    client = gspread.service_account(filename='credentials.json')
-    sheet = client.open_by_url('https://docs.google.com/spreadsheets/d/1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw')
+    # Убедитесь, что у вас есть общедоступная ссылка на Google Sheets
+    gc = gspread.service_account(filename='credentials.json')
+    sheet = gc.open_by_url('https://docs.google.com/spreadsheets/d/1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw/edit?usp=sharing')
     return sheet
 
-# Получаем данные из Google Sheets для Лекций и Лабораторных
+# Функция для получения данных лекций
 def get_lecture_data():
     sheet = authenticate_google_sheets()
-    worksheet = sheet.get_worksheet(0)  # Получаем первый лист (можно изменить)
-    return worksheet.get_all_records()  # Все записи
-
-def get_lab_data():
-    sheet = authenticate_google_sheets()
-    worksheet = sheet.get_worksheet(1)  # Получаем второй лист (можно изменить)
+    worksheet = sheet.get_worksheet(0)  # Первый лист с лекциями
     return worksheet.get_all_records()
 
-# Настройка базы данных и таблиц на Railway (PostgreSQL)
+# Функция для получения данных лабораторных
+def get_lab_data():
+    sheet = authenticate_google_sheets()
+    worksheet = sheet.get_worksheet(1)  # Второй лист с лабораторными заданиями
+    return worksheet.get_all_records()
+
+# Функция для создания таблицы и базы данных на Railway
 def create_db():
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
+    # Создаем таблицу для хранения выбранных тем СРС
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS srs_topics (
             id SERIAL PRIMARY KEY,
@@ -41,7 +44,7 @@ def create_db():
     conn.commit()
     conn.close()
 
-# Добавление темы в базу данных (для СРС)
+# Функция для добавления темы СРС в базу данных
 def add_srs_topic(topic_name):
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
@@ -49,7 +52,7 @@ def add_srs_topic(topic_name):
     conn.commit()
     conn.close()
 
-# Получение всех доступных СРС тем
+# Функция для получения всех доступных СРС тем
 def get_srs_topics():
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
@@ -58,7 +61,7 @@ def get_srs_topics():
     conn.close()
     return rows
 
-# Функция для обработки команды /start
+# Команда /start для бота
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
         [KeyboardButton("Лекции")],
@@ -68,7 +71,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
-# Функция для отображения лекций
+# Показать лекции
 async def show_lectures(update: Update, context: CallbackContext) -> None:
     lectures = get_lecture_data()
     keyboard = []
@@ -83,7 +86,7 @@ async def show_lectures(update: Update, context: CallbackContext) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите лекцию:", reply_markup=reply_markup)
 
-# Функция для отображения лабораторных заданий
+# Показать лабораторные задания
 async def show_labs(update: Update, context: CallbackContext) -> None:
     labs = get_lab_data()
     keyboard = []
@@ -98,7 +101,7 @@ async def show_labs(update: Update, context: CallbackContext) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите лабораторное задание:", reply_markup=reply_markup)
 
-# Функция для отображения выбора СРС тем
+# Показать темы СРС
 async def show_srs_topics(update: Update, context: CallbackContext) -> None:
     topics = get_srs_topics()
     keyboard = []
@@ -112,17 +115,17 @@ async def show_srs_topics(update: Update, context: CallbackContext) -> None:
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите тему для СРС:", reply_markup=reply_markup)
 
-# Функция для выбора СРС темы
+# Выбор темы для СРС
 async def select_srs_topic(update: Update, context: CallbackContext) -> None:
     selected_topic = update.message.text
     user_name = update.message.from_user.first_name
 
-    # Проверяем, была ли тема уже выбрана
+    # Проверка, была ли тема выбрана
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM srs_topics WHERE topic_name = %s", (selected_topic,))
     row = cursor.fetchone()
-    
+
     if row and row[3]:  # Проверяем, была ли тема выбрана
         await update.message.reply_text(f"Тема \"{selected_topic}\" уже выбрана пользователем {row[2]}.")
     else:
@@ -132,9 +135,9 @@ async def select_srs_topic(update: Update, context: CallbackContext) -> None:
     conn.close()
 
 # Настройка бота
-app = Application.builder().token("8088305768:AAEOB7f893L-57dADMyAh32gTApX8iPgFY8").build()
+app = Application.builder().token("TOKEN").build()
 
-# Создание базы данных и таблиц при запуске
+# Создаем базу данных и таблицы при запуске
 create_db()
 
 # Регистрируем обработчики команд
