@@ -1,59 +1,89 @@
 import os
 import pandas as pd
 import datetime
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, CallbackContext, filters
 
-# ID твоей Google Таблицы
-SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
+# ID таблицы
+SPREADSHEET_ID = "1AbCDEfgHIjKlMNO-PQrsTUVWXYZ"
 
-# Функция загрузки данных из Google Sheets
+# Функция загрузки данных
 def get_tasks(task_type):
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
     df = pd.read_csv(url)  # Загружаем таблицу
 
     today = datetime.date.today()
-    tasks = []
+    tasks = {}
 
     for _, row in df.iterrows():
         if row["Тип"] == task_type:
             unlock_date = datetime.datetime.strptime(row["Дата разблокировки"], "%Y-%m-%d").date()
             days_left = (unlock_date - today).days
 
-            if days_left > 0:
-                tasks.append(f"⏳ {row['Название']} будет доступно через {days_left} дней.")
-            else:
-                tasks.append(f"📌 *{row['Название']}*\n{row['Описание']}\n[Ссылка]({row['Ссылка']})")
+            tasks[row["Название"]] = {
+                "description": row["Описание"],
+                "link": row["Ссылка"],
+                "unlock_date": unlock_date,
+                "days_left": days_left
+            }
 
-    return "\n\n".join(tasks) if tasks else "Нет доступных тем."
+    return tasks
 
-# Функция старта
+# Стартовое меню
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [KeyboardButton("📚 Лекционные темы")],
-        [KeyboardButton("🛠 Лабораторные работы")],
-        [KeyboardButton("⬅ Назад")]
+        [InlineKeyboardButton("📚 Лекционные темы", callback_data="lectures")],
+        [InlineKeyboardButton("🛠 Лабораторные работы", callback_data="labs")]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Выберите раздел:", reply_markup=reply_markup)
 
-# Функция отправки лекций
-async def send_lectures(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text(get_tasks("Лекция"), parse_mode="Markdown")
+# Показывает список тем
+async def show_topics(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    task_type = "Лекция" if query.data == "lectures" else "Лабораторная"
+    tasks = get_tasks(task_type)
 
-# Функция отправки лабораторных
-async def send_labs(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text(get_tasks("Лабораторная"), parse_mode="Markdown")
+    if not tasks:
+        await query.message.edit_text("Нет доступных тем.")
+        return
 
-# Запуск бота
+    keyboard = []
+    for name, details in tasks.items():
+        text = f"{name} (⏳ {details['days_left']} дней)" if details["days_left"] > 0 else name
+        keyboard.append([InlineKeyboardButton(text, callback_data=f"task_{name}")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.edit_text(f"📜 {task_type}:", reply_markup=reply_markup)
+
+# Показывает выбранную тему
+async def show_task(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    task_name = query.data.replace("task_", "")
+    
+    tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
+    task = tasks.get(task_name)
+
+    if not task:
+        await query.answer("Тема не найдена.")
+        return
+
+    if task["days_left"] > 0:
+        await query.answer(f"⏳ Доступно через {task['days_left']} дней.")
+    else:
+        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
+        await query.message.edit_text(text, parse_mode="Markdown")
+
+# Настройка бота
 app = Application.builder().token(os.getenv("TOKEN")).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 Лекционные темы"), send_lectures))
-app.add_handler(MessageHandler(filters.TEXT & filters.Regex("🛠 Лабораторные работы"), send_labs))
+app.add_handler(CallbackQueryHandler(show_topics, pattern="^(lectures|labs)$"))
+app.add_handler(CallbackQueryHandler(show_task, pattern="^task_"))
 
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
+
 
 
 
