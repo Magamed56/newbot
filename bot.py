@@ -1,12 +1,82 @@
+
+
+
 import os
 import pandas as pd
-import asyncpg
+import sqlite3
 import datetime
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
 
+
 # ID Google Таблицы
 SPREADSHEET_ID = "1s1F-DONBzaYH8n1JmQmuWS5Z1HW4lH4cz1Vl5wXSqyw"
+# Подключение к SQLite базе данных для хранения данных о СРС
+def create_db():
+    conn = sqlite3.connect('topics.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS topics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE,
+                        user TEXT)''')
+    conn.commit()
+    conn.close()
+
+# Функция для добавления/обновления выбранной темы
+def select_topic(topic, user):
+    conn = sqlite3.connect('topics.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM topics WHERE name = ?", (topic,))
+    result = cursor.fetchone()
+    
+    if result:
+        cursor.execute("UPDATE topics SET user = ? WHERE name = ?", (user, topic))
+    else:
+        cursor.execute("INSERT INTO topics (name, user) VALUES (?, ?)", (topic, user))
+    
+    conn.commit()
+    conn.close()
+
+# Функция для получения всех выбранных тем
+def get_selected_topics():
+    conn = sqlite3.connect('topics.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, user FROM topics")
+    topics = cursor.fetchall()
+    conn.close()
+    return topics
+
+# Функция загрузки данных из Google Sheets
+def get_tasks(task_type):
+    url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv"
+    
+    try:
+        df = pd.read_csv(url)  # Загружаем таблицу
+    except Exception as e:
+        print(f"Ошибка загрузки таблицы: {e}")
+        return {}
+
+    today = datetime.date.today()
+    tasks = {}
+
+    for _, row in df.iterrows():
+        if str(row.get("Тип", "")).strip() == task_type:
+            unlock_date_str = str(row.get("Дата разблокировки", "")).strip()
+
+            try:
+                unlock_date = datetime.datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
+                days_left = (unlock_date - today).days
+            except ValueError:
+                continue  # Пропустить, если дата неправильная
+
+            tasks[row["Название"]] = {
+                "description": row.get("Описание", "Нет описания"),
+                "link": row.get("Ссылка", "#"),
+                "unlock_date": unlock_date,
+                "days_left": days_left
+            }
+
+    return tasks
 
 # Список тем для СРС
 srs_topics = [
@@ -38,94 +108,6 @@ srs_topics = [
     "Платформа для создания опросников", "Приложение для подсчёта голосов", "Система для расчёта налога на имущество",
     "Сайт для получения информации о здоровье", "Платформа для организации онлайн-курсов по кулинарии"
 ]
-
-# Подключение к базе данных PostgreSQL
-async def create_db():
-    conn = await asyncpg.connect(
-        user=os.getenv('PGUSER'),
-        password=os.getenv('PGPASSWORD'),
-        database=os.getenv('PGDATABASE'),
-        host=os.getenv('PGHOST'),
-        port=os.getenv('PGPORT')
-    )
-    
-    await conn.execute('''
-        CREATE TABLE IF NOT EXISTS srs_topics (
-            id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE,
-            user TEXT
-        )
-    ''')
-    await conn.close()
-
-# Функция для добавления/обновления выбранной темы
-async def select_topic(topic, user):
-    conn = await asyncpg.connect(
-        user=os.getenv('PGUSER'),
-        password=os.getenv('PGPASSWORD'),
-        database=os.getenv('PGDATABASE'),
-        host=os.getenv('PGHOST'),
-        port=os.getenv('PGPORT')
-    )
-
-    result = await conn.fetch("SELECT * FROM srs_topics WHERE name = $1", topic)
-    
-    if result:
-        # Обновляем выбранного пользователя для этой темы
-        await conn.execute("UPDATE srs_topics SET user = $1 WHERE name = $2", user, topic)
-    else:
-        # Если тема не была выбрана ранее, добавляем её
-        await conn.execute("INSERT INTO srs_topics (name, user) VALUES ($1, $2)", topic, user)
-
-    await conn.close()
-
-# Функция для получения всех выбранных тем
-async def get_selected_topics():
-    conn = await asyncpg.connect(
-        user=os.getenv('PGUSER'),
-        password=os.getenv('PGPASSWORD'),
-        database=os.getenv('PGDATABASE'),
-        host=os.getenv('PGHOST'),
-        port=os.getenv('PGPORT')
-    )
-    
-    rows = await conn.fetch("SELECT name, user FROM srs_topics")
-    await conn.close()
-    return rows
-
-# Функция отображения тем СРС
-async def show_srs_topics(update: Update, context: CallbackContext) -> None:
-    keyboard = []
-    
-    for topic in srs_topics:
-        # Проверим, есть ли уже кто-то, кто выбрал эту тему
-        selected_topics = await get_selected_topics()
-        selected_by = next((item['user'] for item in selected_topics if item['name'] == topic), "Свободно")
-        
-        if selected_by == "Свободно":
-            keyboard.append([KeyboardButton(f"{topic} (Свободно)")])
-        else:
-            keyboard.append([KeyboardButton(f"{topic} (Выбрано: {selected_by})")])
-
-    keyboard.append([KeyboardButton("⬅ Назад")])
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("Выберите тему СРС:", reply_markup=reply_markup)
-
-# Функция для обработки выбора темы СРС
-async def select_srs_topic(update: Update, context: CallbackContext) -> None:
-    topic = update.message.text.replace(" (Свободно)", "").replace(" (Выбрано: ", "").replace(")", "")
-    
-    # Проверяем, свободна ли тема
-    selected_topics = await get_selected_topics()
-    selected_by = next((item['user'] for item in selected_topics if item['name'] == topic), None)
-    
-    if selected_by is None:
-        # Если тема свободна, сохраняем её как выбранную для текущего пользователя
-        await select_topic(topic, update.message.from_user.username)
-        await update.message.reply_text(f"Вы выбрали тему: {topic}")
-    else:
-        # Если уже выбран другой пользователь
-        await update.message.reply_text(f"Эта тема уже выбрана пользователем: {selected_by}. Вы можете выбрать другую.")
 
 # Главное меню
 async def start(update: Update, context: CallbackContext) -> None:
@@ -174,22 +156,47 @@ async def show_task(update: Update, context: CallbackContext) -> None:
             f"📅 Она откроется {task['unlock_date']} (через {task['days_left']} дней)."
         )
     else:
-        text = f"📌 *{task_name}*\n{task['description']}\n[Ссылка]({task['link']})"
+        text = f"📌 *{task_name}*\n{task['description']}\n[вот вам Ссылка]({task['link']})"
         await update.message.reply_text(text, parse_mode="Markdown")
+
+# Показывает темы для СРС
+async def show_srs_topics(update: Update, context: CallbackContext) -> None:
+    keyboard = []
+    for topic in srs_topics:
+        keyboard.append([KeyboardButton(topic)])
+
+    keyboard.append([KeyboardButton("⬅ Назад")])
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text("📜 Выберите тему для СРС:", reply_markup=reply_markup)
+
+# Обработка выбора темы для СРС
+async def handle_srs_selection(update: Update, context: CallbackContext) -> None:
+    topic_name = update.message.text
+    user_name = update.message.from_user.username
+
+    selected_topics = get_selected_topics()
+    topic_users = [user for t, user in selected_topics if t == topic_name]
+
+    if len(topic_users) > 0:
+        await update.message.reply_text(f"Тема уже выбрана! Выбрано: {', '.join(topic_users)}")
+    else:
+        select_topic(topic_name, user_name)
+        await update.message.reply_text(f"Вы выбрали тему: {topic_name}. Выбор можно изменить.")
 
 # Настройка бота
 app = Application.builder().token(os.getenv("TOKEN")).build()
 
 # Создаем базу данных, если она не существует
+create_db()
+
+# Обработчики
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 Лекционные темы|🛠 Лабораторные работы"), show_topics))
 app.add_handler(MessageHandler(filters.TEXT & filters.Regex("📚 СРС"), show_srs_topics))
 app.add_handler(MessageHandler(filters.TEXT & filters.Regex("⬅ Назад"), start))
 app.add_handler(MessageHandler(filters.TEXT, show_task))
-app.add_handler(MessageHandler(filters.TEXT & filters.Regex(".*"), select_srs_topic))
+app.add_handler(MessageHandler(filters.TEXT, handle_srs_selection))
 
 if __name__ == "__main__":
     print("Бот запущен...")
     app.run_polling()
-
-
