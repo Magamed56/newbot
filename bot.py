@@ -2,6 +2,7 @@
 
 
 import os
+import re
 import pandas as pd
 import sqlite3
 import datetime
@@ -142,7 +143,7 @@ async def show_task(update: Update, context: CallbackContext) -> None:
         await start(update, context)
         return
 
-    task_name = update.message.text.replace(" (⏳", "").split(" дн.)")[0]  # Убираем таймер из кнопки
+    task_name = re.sub(r" \(⏳ \d+ дн.\)", "", update.message.text)  # Убираем таймер из кнопки
     tasks = get_tasks("Лекция") | get_tasks("Лабораторная")  # Объединяем лекции и лабораторные
     task = tasks.get(task_name)
 
